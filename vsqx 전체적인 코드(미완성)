@@ -1,0 +1,221 @@
+#python_서버_구축_colab
+
+!pip install git+https://github.com/openai/whisper.git
+!pip install flask flask-cors pyngrok librosa pykakasi
+import os, whisper, librosa, torch, pykakasi
+import numpy as np
+import xml.etree.ElementTree as ET
+from flask import Flask, request, send_file
+from flask_cors import CORS
+from pyngrok import ngrok
+
+model = whisper.load_model("medium").to("cuda" if torch.cuda.is_available() else "cpu")
+kks = pykakasi.kakasi()
+
+from flask import Flask, request, send_file
+from flask_cors import CORS
+import os, numpy as np, librosa
+
+app = Flask(__name__)
+CORS(app)
+
+def hz_to_midi(hz):
+    if hz <= 0 or np.isnan(hz): return 64
+    midi = int(round(12 * np.log2(hz / 440.0) + 69))
+    return max(0, min(127, midi))
+
+@app.route("/convert", methods=["POST"])
+def convert():
+    try:
+        audio_file = request.files['file']
+        bpm = int(request.form.get('bpm', 120))
+        full_lyrics = request.form.get('full_lyrics', "")
+        
+        in_p, au_p, vsq_p = "input.wav", "temp.wav", "output.vsqx"
+        audio_file.save(in_p)
+        os.system(f'ffmpeg -i "{in_p}" -vn -acodec pcm_s16le -ar 22050 -ac 1 "{au_p}" -y')
+        
+        res = model.transcribe(au_p, language="ja", word_timestamps=True)
+        y, sr = librosa.load(au_p, sr=22050)
+        user_lyrics = [char for char in full_lyrics.replace(" ", "").replace("\n", "")]
+        lyric_idx = 0
+
+        # XML 헤더 및 구조 생성
+        xml_body = f'''<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<vsq4 xmlns="http://www.yamaha.co.jp/vocaloid/schema/vsq4/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.yamaha.co.jp/vocaloid/schema/vsq4/ vsq4.xsd">
+    <vender><![CDATA[Yamaha corporation]]></vender>
+    <version><![CDATA[4.0.0.3]]></version>
+    <vVoiceTable>
+        <vVoice>
+            <bs>0</bs>
+            <pc>0</pc>
+            <id><![CDATA[BHNME578NG2S3HD8]]></id>
+            <name><![CDATA[MIKU_V4X_Original]]></name>
+        </vVoice>
+    </vVoiceTable>
+    <masterTrack>
+        <seqLen>4800</seqLen>
+        <tempo><t>0</t><v>{bpm * 100}</v></tempo>
+    </masterTrack>
+    <vsTrack>
+        <tNo>0</tNo>
+        <name><![CDATA[Voice]]></name>
+        <vsPart>
+            <t>0</t>
+            <playTime>614400</playTime>
+            <name><![CDATA[NewPart]]></name>'''
+
+        tps = (bpm / 60) * 480
+        for seg in res['segments']:
+            for w in seg.get('words', []):
+                start, end, text = w['start'], w['end'], w['word'].strip()
+                if not text: continue
+
+                if user_lyrics and lyric_idx < len(user_lyrics):
+                    hira = "".join([i['hira'] for i in kks.convert(user_lyrics[lyric_idx])])
+                    lyric_idx += 1
+                else:
+                    hira = "".join([i['hira'] for i in kks.convert(text)])
+
+                f0, vcd, _ = librosa.pyin(y[int(start*sr):int(end*sr)], fmin=librosa.note_to_hz('C3'), fmax=librosa.note_to_hz('C6'))
+                midi_val = hz_to_midi(np.nanmedian(f0[vcd])) if any(vcd) else 64
+
+                # 개별 노트 XML (예시 파일과 동일하게 lock="1" 및 스타일 추가)
+                xml_body += f'''
+            <note>
+                <t>{int(start * tps)}</t>
+                <dur>{max(int((end - start) * tps), 120)}</dur>
+                <n>{midi_val}</n>
+                <v>64</v>
+                <y><![CDATA[{hira}]]></y>
+                <p lock="1"><![CDATA[{hira}]]></p>
+                <nStyle>
+                    <v id="accent">64</v>
+                    <v id="bendDep">0</v>
+                    <v id="bendLen">0</v>
+                    <v id="decay">50</v>
+                    <v id="fallPort">0</v>
+                    <v id="opening">127</v>
+                    <v id="risePort">0</v>
+                    <v id="vibLen">0</v>
+                    <v id="vibType">0</v>
+                </nStyle>
+            </note>'''
+
+        # XML 닫기
+        xml_body += '''
+        </vsPart>
+    </vsTrack>
+</vsq4>'''
+
+        with open(vsq_p, "w", encoding="utf-8") as f:
+            f.write(xml_body)
+
+        return send_file(vsq_p, as_attachment=True)
+    except Exception as e:
+        return str(e), 500
+
+# ngrok 설정 (토큰 필수)
+ngrok.kill()
+# 여기에 본인의 토큰을 넣으세요
+ngrok.set_auth_token("3CTUfzhjmItv0gCQRzI7O1QAL5v_xYRPmbCgdBbM7bQyDa43")
+public_url = ngrok.connect(5000).public_url
+print(f"✅ 서버 주소: {public_url}")
+
+if __name__ == "__main__":
+    app.run(port=5000)
+
+
+
+  
+
+#html
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice to VSQX - Colab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-md w-full bg-gray-800 p-8 rounded-2xl border border-gray-700 shadow-2xl">
+        <h1 class="text-2xl font-bold mb-2 text-blue-400">범용 음성 VSQX 추출기</h1>
+        <p class="text-gray-500 text-sm mb-6">Colab Backend 기반</p>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1 font-bold">BPM (입력 필수)</label>
+                <input type="number" id="bpm" value="120" class="w-full bg-gray-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            
+            <div class="relative border-2 border-dashed border-gray-600 p-10 rounded-xl text-center hover:bg-gray-700 transition">
+                <input type="file" id="videoFile" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                <p id="fileName" class="text-gray-300">영상을 여기로 드래그하거나 클릭</p>
+            </div>
+
+            <button onclick="upload()" id="btn" class="w-full bg-blue-600 py-4 rounded-xl font-bold hover:bg-blue-500 shadow-lg active:scale-95 transition">추출 및 다운로드</button>
+            
+            <div id="status" class="hidden">
+                <div class="flex justify-center mb-2"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div></div>
+                <p class="text-center text-sm text-blue-400 animate-pulse">AI가 영상의 음정과 가사를 분석 중입니다...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ★ 코랩에서 생성된 "접속 주소"를 여기에 붙여넣으세요 ★
+        const API_URL = "https://disfigure-pasta-waggle.ngrok-free.dev";
+
+        const fileInput = document.getElementById('videoFile');
+        fileInput.onchange = () => { if(fileInput.files[0]) document.getElementById('fileName').innerText = fileInput.files[0].name; };
+
+        async function upload() {
+            const file = fileInput.files[0];
+            if(!file) return alert("분석할 파일을 선택해 주세요.");
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('bpm', document.getElementById('bpm').value);
+
+            document.getElementById('status').classList.remove('hidden');
+            document.getElementById('btn').classList.add('hidden');
+
+            try {
+                const res = await fetch(`${API_URL}/convert`, { method: 'POST', body: formData });
+                if(!res.ok) throw new Error("서버 오류");
+
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `voice_to_vsqx_${Date.now()}.vsqx`;
+                a.click();
+            } catch (e) {
+                alert("연결 실패! 주소가 맞는지, 혹은 코랩 서버가 실행 중인지 확인하세요.");
+            } finally {
+                document.getElementById('status').classList.add('hidden');
+                document.getElementById('btn').classList.remove('hidden');
+            }
+        }
+    </script>
+
+<textarea id="lyricsInput" placeholder="실제 가사를 여기에 붙여넣으세요 (공백 상관없음)" rows="5" style="width:100%"></textarea>
+
+<script>
+// JS 업로드 함수 부분 수정
+async function uploadFile() {
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    formData.append("bpm", document.getElementById("bpmInput").value);
+    formData.append("full_lyrics", document.getElementById("lyricsInput").value); // 가사 추가
+
+    const response = await fetch(`${API_URL}/convert`, {
+        method: "POST",
+        body: formData
+    });
+    // ... 이하 동일
+}
+</script>
+</body>
+</html>

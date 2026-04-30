@@ -117,7 +117,6 @@ def convert():
 
 # ngrok 설정 (토큰 필수)
 ngrok.kill()
-# 여기에 본인의 토큰을 넣으세요
 ngrok.set_auth_token("3CTUfzhjmItv0gCQRzI7O1QAL5v_xYRPmbCgdBbM7bQyDa43")
 public_url = ngrok.connect(5000).public_url
 print(f"✅ 서버 주소: {public_url}")
@@ -164,7 +163,6 @@ if __name__ == "__main__":
     </div>
 
     <script>
-        // ★ 코랩에서 생성된 "접속 주소"를 여기에 붙여넣으세요 ★
         const API_URL = "https://disfigure-pasta-waggle.ngrok-free.dev";
 
         const fileInput = document.getElementById('videoFile');

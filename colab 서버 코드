@@ -1,5 +1,5 @@
 #python_서버_구축_colab
-
+!pip install openai-whisper pykakasi flasgger flask-cors pyngrok librosa
 import os, whisper, librosa, torch, pykakasi
 import numpy as np
 from flask import Flask, request, send_file
@@ -28,35 +28,54 @@ def convert_to_phoneme(text):
     roma_list = [i['hepburn'] for i in result]
     
     hira_str = "".join(hira_list)
-    
-    # 보컬로이드 자음+모음 음소 분리 규칙 적용 가이드라인
     phonemes = []
+    
     for roma in roma_list:
         roma = roma.lower()
-        # 보컬로이드 예외 발음 처리 (sh, ch, ts 등 자음 결합 패턴 분리)
+        
+        # 1. 보컬로이드 전용 복합 자음 선처리 규칙
         if roma.startswith(('sha', 'shu', 'sho')):
-            p = f"S {roma[-1]}"
+            consonant, vowel = "S", roma[-1]
         elif roma.startswith(('cha', 'chu', 'cho')):
-            p = f"tS {roma[-1]}"
-        elif roma.startswith(('tsu',)):
-            p = "ts u"
-        elif roma == "shi": p = "S i"
-        elif roma == "chi": p = "tS i"
-        elif roma == "fu": p = "p\ i"
+            consonant, vowel = "tS", roma[-1]
+        elif roma == "shi":
+            consonant, vowel = "S", "i"
+        elif roma == "chi":
+            consonant, vowel = "tS", "i"
+        elif roma == "fu":
+            consonant, vowel = "p\\", "u"  # 보컬로이드 fu 발음 특수기호
+        elif roma == "tsu":
+            consonant, vowel = "ts", "u"
         elif len(roma) > 1 and roma[-1] in ['a', 'i', 'u', 'e', 'o']:
-            # 일반적인 자음 + 모음 분리 (예: ka -> k a / yu -> j u)
-            consonant = roma[:-1]
-            vowel = roma[-1]
-            # 보컬로이드 로마자 자음 맵핑 표준화
-            if consonant == 'y': consonant = 'j'
-            elif consonant == 'j': consonant = 'dZ'
-            elif consonant == 'c': consonant = 'k'
-            phonemes.append(f"{consonant} {vowel}")
-            continue
+            # 일반적인 자음 + 모음 분리
+            consonant, vowel = roma[:-1], roma[-1]
         else:
-            # 단독 모음 또는 받침(n) 처리
-            if roma == 'n': p = 'M'
-            else: p = roma
+            # 단독 모음 또는 받침(n) 처리 구간
+            consonant, vowel = "", roma
+
+        # 2. [예외 규칙 2 반영] r 발음은 자음 '4'로 치환
+        if consonant == 'r':
+            consonant = '4'
+        elif consonant == 'y':
+            consonant = 'j'
+        elif consonant == 'j':
+            consonant = 'dZ'
+        elif consonant == 'c':
+            consonant = 'k'
+
+        # 3. [예외 규칙 1 반영] 모음 'u' 발음은 'M'으로 치환
+        if vowel == 'u':
+            vowel = 'M'
+        elif vowel == 'n' and not consonant:
+            # 일본어 받침 'ん(n)'은 보컬로이드 기호로 'M' 또는 'N'을 씁니다.
+            vowel = 'M'
+
+        # 자음과 모음 결합하여 음소 완성
+        if consonant:
+            p = f"{consonant} {vowel}"
+        else:
+            p = vowel
+            
         phonemes.append(p)
         
     phoneme_str = " ".join(phonemes)
@@ -160,6 +179,7 @@ def convert():
 	<vsTrack>
 		<tNo>0</tNo>
 		<name><![CDATA[Main]]></name>
+		<comment><![CDATA[Track]]></comment>
 		<vsPart>
 			<t>0</t>
 			<playTime>{total_play_time_ticks}</playTime>
@@ -190,29 +210,27 @@ def convert():
 			<cc><t>0</t><v id="C">10</v></cc>
 			<cc><t>0</t><v id="D">64</v></cc>'''
 
-        # 5. Note 생성부
+       
         # 5. Note 생성부 (vsPart 내부에서 반복 호출)
-        tps = (bpm / 60) * 480
         for seg in res['segments']:
             for w in seg.get('words', []):
                 start, end, text = w['start'], w['end'], w['word'].strip()
                 if not text: continue
 
-                # 가사 매칭 (사용자 입력 가사가 있으면 우선 적용, 없으면 AI 인식 가사 사용)
                 if user_lyrics and lyric_idx < len(user_lyrics):
-                    hira = "".join([i['hira'] for i in kks.convert(user_lyrics[lyric_idx])])
+                    target_text = user_lyrics[lyric_idx]
                     lyric_idx += 1
                 else:
-                    hira = "".join([i['hira'] for i in kks.convert(text)])
+                    target_text = text
 
-                # 음성 분석을 통한 실시간 피치 검출 및 MIDI 음정 번호 환산
+                hira, phoneme = convert_to_phoneme(target_text)
+
                 f0, vcd, _ = librosa.pyin(y[int(start*sr):int(end*sr)], fmin=librosa.note_to_hz('C3'), fmax=librosa.note_to_hz('C6'))
                 midi_val = hz_to_midi(np.nanmedian(f0[vcd])) if any(vcd) else 64
 
-                # 계산된 시간 파라미터 값 추출
                 note_t = int(start * tps)
-                note_dur = max(int((end - start) * tps), 120) # 최소 길이 120틱 방어 코드
-
+                note_dur = max(int((end - start) * tps), 120)
+								
                 # [요청사항 반영] 지정해주신 정식 <note> 및 <nStyle> 구조 출력부
                 xml_content += f'''
 			<note>
@@ -221,7 +239,7 @@ def convert():
 				<n>{midi_val}</n>
 				<v>64</v>
 				<y><![CDATA[{hira}]]></y>
-				<p><![CDATA[{hira}]]></p>
+				<p><![CDATA[{phoneme}]]></p>
 				<nStyle>
 					<v id="accent">50</v>
 					<v id="bendDep">0</v>

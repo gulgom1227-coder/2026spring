@@ -1,259 +1,128 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VOCALOID VSQX Converter</title>
+    <title>VOCALOID VSQX Advanced Workstation</title>
     <style>
-        /* 1. 디자인 컨셉 변수 설정 (다크 모드 & 하츠네 미쿠 민트 포인트) */
         :root {
             --bg-dark: #0f111a;
             --bg-card: #161925;
             --text-main: #f0f2f5;
             --text-muted: #8a92a6;
-            --accent-color: #39c5bb; /* 미쿠 가디언 민트 */
+            --accent-color: #39c5bb; /* 하츠네 미쿠 시그니처 민트 */
             --accent-hover: #2ba89f;
             --border-color: #262b40;
+            --list-hover: #1e2235;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        /* 2. 메인 컨테이너 디자인 */
-        .converter-container {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            width: 100%;
-            max-width: 520px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 35px;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            color: var(--text-main);
-            margin-bottom: 8px;
-        }
-
-        .header p {
-            font-size: 14px;
-            color: var(--text-muted);
-        }
-
-        /* 3. 폼 입력창 및 레이블 디자인 */
-        .form-group {
-            margin-bottom: 24px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* 파일 드롭존 스타일 */
-        .file-dropzone {
-            border: 2px dashed var(--border-color);
-            border-radius: 10px;
-            padding: 30px 20px;
-            text-align: center;
-            background-color: rgba(255, 255, 255, 0.02);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .file-dropzone:hover, .file-dropzone.dragover {
-            border-color: var(--accent-color);
-            background-color: rgba(57, 197, 187, 0.04);
-        }
-
-        .file-dropzone svg {
-            width: 40px;
-            height: 40px;
-            fill: var(--text-muted);
-            margin-bottom: 10px;
-            transition: fill 0.3s ease;
-        }
-
-        .file-dropzone:hover svg {
-            fill: var(--accent-color);
-        }
-
-        .file-dropzone p {
-            font-size: 14px;
-            color: var(--text-muted);
-        }
-
-        .file-dropzone .file-name-display {
-            font-weight: 600;
-            color: var(--accent-color);
-            margin-top: 5px;
-            display: none;
-        }
-
-        #file-input {
-            display: none;
-        }
-
-        /* 텍스트 입력창 및 가사 입력 필드 */
-        input[type="number"], textarea {
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px 16px;
-            color: var(--text-main);
-            font-size: 15px;
-            transition: all 0.3s ease;
-            outline: none;
-        }
-
-        input[type="number"]:focus, textarea:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.15);
-        }
-
-        textarea {
-            resize: vertical;
-            height: 100px;
-            min-height: 80px;
-        }
-
-        /* 4. 변환 버튼 및 로딩 애니메이션 */
-        .submit-btn {
-            width: 100%;
-            background-color: var(--accent-color);
-            color: #000;
-            border: none;
-            border-radius: 8px;
-            padding: 14px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .submit-btn:hover {
-            background-color: var(--accent-hover);
-            transform: translateY(-1px);
-        }
-
-        .submit-btn:disabled {
-            background-color: var(--border-color);
-            color: var(--text-muted);
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* 로딩 스피너 애니메이션 */
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(0,0,0,0.1);
-            border-radius: 50%;
-            border-top-color: #000;
-            animation: spin 1s ease-in-out infinite;
-            display: none;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* 상태 에러/성공 메시지 박스 */
-        .status-message {
-            margin-top: 20px;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            display: none;
-            text-align: center;
-        }
-        .status-message.error {
-            background-color: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-        .status-message.success {
-            background-color: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); display: flex; flex-direction: column; align-items: center; padding: 50px 20px; }
+        .station-wrapper { width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 35px; }
+        .vsqx-chamber, .archive-chamber { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; width: 100%; padding: 40px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4); }
+        .chamber-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+        .chamber-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 30px; }
+        .form-group { margin-bottom: 24px; }
+        .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+        .file-dropzone { border: 2px dashed var(--border-color); border-radius: 10px; padding: 30px 20px; text-align: center; cursor: pointer; }
+        .file-name-display { font-weight: 600; color: var(--accent-color); margin-top: 5px; display: none; }
+        #file-input { display: none; }
+        input[type="number"], textarea { width: 100%; background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; color: var(--text-main); outline: none; }
+        textarea { resize: vertical; height: 90px; }
+        .submit-btn { width: 100%; background-color: var(--accent-color); color: #000; border: none; border-radius: 8px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .submit-btn:hover { background-color: var(--accent-hover); }
+        .submit-btn:disabled { background-color: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+        .status-message { margin-top: 20px; padding: 12px; border-radius: 8px; font-size: 13px; display: none; text-align: center; }
+        .status-message.error { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .status-message.success { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .archive-list { display: flex; flex-direction: column; gap: 12px; }
+        .archive-item { display: flex; justify-content: space-between; align-items: center; background-color: rgba(0, 0, 0, 0.15); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px 20px; }
+        .song-info { display: flex; flex-direction: column; gap: 4px; }
+        .song-title { font-size: 15px; font-weight: 600; }
+        .song-meta { font-size: 12px; color: var(--text-muted); }
+        .download-action-btn { background-color: transparent; color: var(--accent-color); border: 1px solid var(--accent-color); border-radius: 6px; padding: 8px 16px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .download-action-btn:hover { background-color: var(--accent-color); color: #000; }
     </style>
 </head>
 <body>
 
-<div class="converter-container">
-    <div class="header">
-        <h1>VSQX GENESIS</h1>
-        <p>음성 오디오 파일을 미쿠 V4X용 VSQX 파일로 정밀 변환합니다.</p>
+<div class="station-wrapper">
+
+    <div class="vsqx-chamber">
+        <div class="chamber-title">⚡ AI VSQX CONVERTER</div>
+        <div class="chamber-subtitle">오디오 소스를 정밀 분석하여 보컬로이드 4 규격 시퀀스 파일로 추출합니다.</div>
+        <form id="convert-form">
+            <div class="form-group">
+                <label class="form-label">Voice Source File</label>
+                <div class="file-dropzone" id="dropzone">
+                    <p id="dropzone-text">WAV / MP3 소스를 여기에 드롭하거나 창을 탭하세요.</p>
+                    <p class="file-name-display" id="file-name"></p>
+                    <input type="file" id="file-input" accept="audio/*" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="bpm-input">BPM Setup</label>
+                <input type="number" id="bpm-input" value="120" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="lyrics-input">Japanese Lyrics (Optional)</label>
+                <textarea id="lyrics-input" placeholder="순서에 일치시킬 일본어 가사를 기입하세요."></textarea>
+            </div>
+            <button type="submit" class="submit-btn" id="submit-btn">START CONVERSION</button>
+        </form>
+        <div class="status-message" id="status-box"></div>
     </div>
 
-    <form id="convert-form">
-        <div class="form-group">
-            <label class="form-label">Audio Vocal File</label>
-            <div class="file-dropzone" id="dropzone">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-                </svg>
-                <p id="dropzone-text">WAV, MP3 파일을 이리로 드래그하거나 클릭하세요.</p>
-                <p class="file-name-display" id="file-name"></p>
-                <input type="file" id="file-input" accept="audio/*" required>
+    <div class="archive-chamber">
+        <div class="chamber-title">📦 ORIGINAL WAV ARCHIVE</div>
+        <div class="chamber-subtitle">작곡가들이 제공한 튜닝용 순수 원본 오디오(WAV) 소스 보관소입니다.</div>
+        <div class="archive-list">
+            <div class="archive-item">
+                <div class="song-info">
+                    <span class="song-title">멜트 (Melt / メルト)</span>
+                    <span class="song-meta">Producer: ryo (supercell) | Format: WAV Audio</span>
+                </div>
+                <button class="download-action-btn" onclick="triggerAudioDownload('melt')">📥 WAV GET</button>
+            </div>
+            <div class="archive-item">
+                <div class="song-info">
+                    <span class="song-title">PPPP</span>
+                    <span class="song-meta">Producer: TAK | Format: WAV Audio</span>
+                </div>
+                <button class="download-action-btn" onclick="triggerAudioDownload('pppp')">📥 WAV GET</button>
+            </div>
+            <div class="archive-item">
+                <div class="song-info">
+                    <span class="song-title">월드 이즈 마인 (World is Mine)</span>
+                    <span class="song-meta">Producer: ryo (supercell) | Format: WAV Audio</span>
+                </div>
+                <button class="download-action-btn" onclick="triggerAudioDownload('world_is_mine')">📥 WAV GET</button>
+            </div>
+            <div class="archive-item">
+                <div class="song-info">
+                    <span class="song-title">천본앵 (Senbonzakura / 千本桜)</span>
+                    <span class="song-meta">Producer: 黒うさP | Format: WAV Audio</span>
+                </div>
+                <button class="download-action-btn" onclick="triggerAudioDownload('senbonzakura')">📥 WAV GET</button>
             </div>
         </div>
+    </div>
 
-        <div class="form-group">
-            <label class="form-label" for="bpm-input">BPM (Tempo)</label>
-            <input type="number" id="bpm-input" value="120" min="20" max="300" required>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="lyrics-input">Full Lyrics (Optional)</label>
-            <textarea id="lyrics-input" placeholder="정렬할 일본어 가사를 한 줄로 입력하면 음절 매칭이 정교해집니다.&#10;(예: ありがとう)"></textarea>
-        </div>
-
-        <button type="submit" class="submit-btn" id="submit-btn">
-            <div class="spinner" id="btn-spinner"></div>
-            <span id="btn-text">CONVERT TO VSQX</span>
-        </button>
-    </form>
-
-    <div class="status-message" id="status-box"></div>
 </div>
 
 <script>
-    // 파이썬 Flask 서버의 공공 ngrok 주소 연동 (여기에 실제 발급된 ngrok 주소를 넣어주세요)
-    const SERVER_URL = "https://disfigure-pasta-waggle.ngrok-free.dev"; 
+    // -------------------------------------------------------------
+    // 💾 [WAV 오디오 Base64 데이터 스토리지]
+    // 제공받으실 WAV 파일의 Base64 텍스트를 각 항목 따옴표 안에 넣어주세요.
+    // -------------------------------------------------------------
+
+
+
+    // -------------------------------------------------------------
+    // 🌍 [AI 변환기 핵심 연동 모듈]
+    // -------------------------------------------------------------
+    const SERVER_URL = "https://disfigure-pasta-waggle.ngrok-free.dev"; // 👈 실제 구동 중인 ngrok 주소 입력
 
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
@@ -261,31 +130,15 @@
     const fileNameDisplay = document.getElementById('file-name');
     const form = document.getElementById('convert-form');
     const submitBtn = document.getElementById('submit-btn');
-    const btnSpinner = document.getElementById('btn-spinner');
-    const btnText = document.getElementById('btn-text');
     const statusBox = document.getElementById('status-box');
 
-    // 드래그 앤 드롭 이벤트 바인딩
+    // 드롭존 파일 선택 처리
     dropzone.addEventListener('click', () => fileInput.click());
-    
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-    });
-
-    dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('dragover');
-    });
-
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); });
     dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropzone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            fileInput.files = e.dataTransfer.files;
-            updateFileName();
-        }
+        if (e.dataTransfer.files.length > 0) { fileInput.files = e.dataTransfer.files; updateFileName(); }
     });
-
     fileInput.addEventListener('change', updateFileName);
 
     function updateFileName() {
@@ -296,19 +149,13 @@
         }
     }
 
-    // 서버 비동기 전송 이벤트
+    // AI 변환 요청 비동기 전송 함수
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!fileInput.files[0]) { showStatus("오디오 파일을 선택해 주세요.", "error"); return; }
 
-        if (!fileInput.files[0]) {
-            showStatus("오디오 파일을 선택해 주세요.", "error");
-            return;
-        }
-
-        // 로딩UI 활성화
         submitBtn.disabled = true;
-        btnSpinner.style.display = 'block';
-        btnText.textContent = "AI ANALYZING & CONVERTING...";
+        submitBtn.textContent = "AI ANALYZING & CONVERTING...";
         statusBox.style.display = 'none';
 
         const formData = new FormData();
@@ -318,33 +165,23 @@
 
         try {
             const targetUrl = SERVER_URL.endsWith('/') ? `${SERVER_URL}convert` : `${SERVER_URL}/convert`;
-            const response = await fetch(targetUrl, {
-                method: 'POST',
-                body: formData
-            });
+            const response = await fetch(targetUrl, { method: 'POST', body: formData });
+            if (!response.ok) throw new Error("서버 연산 처리 중 에러가 발생했습니다.");
 
-            if (!response.ok) {
-                throw new Error("서버 연산 처리 중 에러가 발생했습니다.");
-            }
-
-            // 다운로드 스트림 데이터 변환
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = "output.vsqx"; // 다운로드될 파일명
+            a.download = "output.vsqx";
             document.body.appendChild(a);
             a.click();
             a.remove();
-
             showStatus("성공적으로 VSQX 파일이 추출 및 다운로드되었습니다!", "success");
         } catch (error) {
             showStatus(error.message, "error");
         } finally {
-            // 로딩UI 복구
             submitBtn.disabled = false;
-            btnSpinner.style.display = 'none';
-            btnText.textContent = "CONVERT TO VSQX";
+            submitBtn.textContent = "START CONVERSION";
         }
     });
 
@@ -352,6 +189,44 @@
         statusBox.textContent = msg;
         statusBox.className = `status-message ${type}`;
         statusBox.style.display = 'block';
+    }
+
+    // -------------------------------------------------------------
+    // 📥 [로컬 WAV 다운로드 변환 엔진]
+    // -------------------------------------------------------------
+    function triggerAudioDownload(trackKey) {
+        const base64String = embeddedAudioDatabase[trackKey];
+        
+        if (!base64String || base64String.length < 100) {
+            alert(`'${trackKey}' 곡의 실제 WAV 파일 데이터가 주입되지 않았습니다.`);
+            return;
+        }
+
+        try {
+            const byteCharacters = atob(base64String);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            
+            const audioBlob = new Blob([byteArray], { type: 'audio/wav' });
+            const virtualUrl = URL.createObjectURL(audioBlob);
+            
+            const anchorNode = document.createElement('a');
+            anchorNode.href = virtualUrl;
+            anchorNode.download = `${trackKey}_original_source.wav`;
+            
+            document.body.appendChild(anchorNode);
+            anchorNode.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(anchorNode);
+                URL.revokeObjectURL(virtualUrl);
+            }, 100);
+        } catch (error) {
+            alert("파일 복원 중 오류가 발생했습니다: " + error.message);
+        }
     }
 </script>
 </body>
